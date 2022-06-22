@@ -1,10 +1,56 @@
 <template>
   <div class="home">
     <Hero />
+
+    <Loading v-if="$fetchState.pending" />
+
+    <div class="container search">
+      <input @keyup.enter="$fetch" type="text" placeholder="Search" v-model.lazy="searchInput" />
+      <button @click="clearSearch" v-show="searchInput !== ''" class="button">Clear Search</button>
+    </div>
+
     <div class="container movies">
-      <div id="movie-grid" class="movies-grid">
+      <!--Searched Movies-->
+      <div v-if="searchInput !== ''" id="movie-grid" class="movies-grid">
+        <div class="movie" v-for="(movie, index) in searchedMovies" :key="index">
+          <div class="movie-img">
+            <p class="no-img" v-if="movie.poster_path === null">No image</p>
+            <img 
+              :src="`https://image.tmdb.org/t/p/w500/${movie.poster_path}`"
+            />
+            <p class="review">{{ movie.vote_average }}</p>
+            <p class="overview">{{ movie.overview }}</p>
+          </div>
+          <div class="info">
+            <p 
+              class="title">{{ movie.title.slice(0, 25) }}
+              <span v-if="movie.title.length > 25">...</span>
+            </p>
+            <p class="release">
+              Released: 
+              {{
+                new Date(movie.release_date).toLocaleString('en-us', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              }}
+            </p>
+            <NuxtLink
+              class="button button-light"
+              :to="{ name: 'movies-movieid', params: { movieid: movie.id } }"
+            >
+              Get More Info
+            </NuxtLink>
+          </div>
+        </div>
+      </div>
+
+      <!--All Movies-->
+      <div v-else id="movie-grid" class="movies-grid">
         <div class="movie" v-for="(movie, index) in movies" :key="index">
           <div class="movie-img">
+            <p class="no-img" v-if="movie.poster_path === null">No image</p>
             <img 
               :src="`https://image.tmdb.org/t/p/w500/${movie.poster_path}`"
             />
@@ -44,14 +90,38 @@ import axios from 'axios';
 
 export default {
   name: 'Home',
+  head() {
+    return {
+      title: 'Movie App - Latest Streaming Movie Info',
+      meta: [
+        {
+          hid: 'description',
+          name: 'description',
+          content: 'Get all the latest streaming movies in theaters & online',
+        },
+        {
+          hid: 'keywords',
+          name: 'keywords',
+          content: 'movies, stream, streaming',
+        }
+      ]
+    }
+  },
   data() {
     return {
       movies: [],
+      searchedMovies: [],
+      searchInput: '',
     }
   },
   async fetch() {
-    await this.getMovies()
+    if(this.searchInput === '') {
+      await this.getMovies()
+      return
+    }
+      await this.searchMovies()
   },
+  fetchDelay: 1000,
   methods: {
     async getMovies() {
       const data = axios.get(
@@ -63,6 +133,23 @@ export default {
         this.movies.push(movie);
       });
       console.log(this.movies);
+    },
+
+    async searchMovies() {
+      const data = axios.get(
+        `https://api.themoviedb.org/3/search/movie?api_key=22c2a03a70f983166c1d63c0e61ff919&language=en-US&page=1&query=${this.searchInput}`
+      )
+
+      const result = await data;
+      result.data.results.forEach((movie) => {
+        this.searchedMovies.push(movie);
+      });
+      console.log(this.searchedMovies);
+    },
+
+    clearSearch() {
+      this.searchInput = '';
+      this.searchedMovies = [];
     }
   }
 
@@ -104,7 +191,7 @@ export default {
         grid-template-columns: repeat(2, 1fr);
       }
       @media (min-width: 750px) {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
       }
       @media (min-width: 1100px) {
         grid-template-columns: repeat(4, 1fr);
@@ -114,12 +201,25 @@ export default {
         display: flex;
         flex-direction: column;
         .movie-img {
+          background-color: #434343;
           position: relative;
           overflow: hidden;
+          height: 100%;
           &:hover {
             .overview {
               transform: translateY(0);
             }
+          }
+          .no-img {
+            position: absolute;
+            color: #ffffff;
+            font-size: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            left: 0;
+            right: 0;
+            margin: auto;
+            text-align: center;
           }
           img {
             display: block;
